@@ -15,4 +15,4 @@ async def root():
 async def run(params :PlaybookParams):
     from runner import AnsibleRunner
     runner = AnsibleRunner()
-    runner.run_playbook(host=params.host, role=params.role)
+    runner.run_playbook(params.host, params.role)
