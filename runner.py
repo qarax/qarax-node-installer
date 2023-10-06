@@ -40,6 +40,3 @@ class AnsibleRunner:
             extravars=extra_vars,
             inventory={'all': hosts},
             event_handler=self.runner_process_messages)
-
-r = AnsibleRunner()
-r.run_playbook()
