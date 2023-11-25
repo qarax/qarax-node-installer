@@ -14,7 +14,7 @@ class AnsibleRunner:
         if event == 'playbook_on_task_start':
             pprint(data['event_data'])
 
-    def run_playbook(self, host: str, role: str):
+    def run_playbook(self, host: str, role: str, password: str):
         playbook = {
             'hosts': 'all',
             'gather_facts': True,
@@ -31,7 +31,7 @@ class AnsibleRunner:
             },
             'vars':{
                 'ansible_user': 'root',
-                'ansible_password': 'centos',
+                'ansible_password': password,
             }
         }
         thread, r = ansible_runner.run_async(

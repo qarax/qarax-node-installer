@@ -6,6 +6,7 @@ app = FastAPI()
 class PlaybookParams(BaseModel):
     role: str
     host: str
+    password: str
 
 @app.get("/")
 async def root():
@@ -15,4 +16,4 @@ async def root():
 async def run(params :PlaybookParams):
     from .runner import AnsibleRunner
     runner = AnsibleRunner()
-    runner.run_playbook(params.host, params.role)
+    runner.run_playbook(params.host, params.role, params.password)
