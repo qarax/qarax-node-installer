@@ -13,6 +13,6 @@ async def root():
 
 @app.post("/run/")
 async def run(params :PlaybookParams):
-    from runner import AnsibleRunner
+    from .runner import AnsibleRunner
     runner = AnsibleRunner()
     runner.run_playbook(params.host, params.role)
