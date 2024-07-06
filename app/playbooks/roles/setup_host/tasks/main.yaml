@@ -1,3 +1,3 @@
 
 - name: Setup host
-  import_tasks: install_firecracker.yaml
+  import_tasks: install_ch.yaml
