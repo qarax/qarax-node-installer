@@ -1,0 +1,5 @@
+# roles/setup_host/defaults/main.yaml
+---
+bridge_name: br0
+primary_interface: "{{ ansible_default_ipv4.interface }}"
+chversion: "43.0"

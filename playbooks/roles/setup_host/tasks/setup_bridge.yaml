@@ -1,0 +1,150 @@
+---
+# roles/setup_host/tasks/setup_bridge.yaml
+- name: Determine primary network interface
+  set_fact:
+    primary_interface: "{{ ansible_default_ipv4.interface }}"
+
+- name: Debug - Show primary interface
+  debug:
+    var: primary_interface
+
+- name: Ensure NetworkManager is installed and running
+  dnf:
+    name: NetworkManager
+    state: present
+
+- name: Debug - Show network interfaces
+  command: ip a
+  register: network_interfaces
+  changed_when: false
+
+- name: Debug - Show network interfaces output
+  debug:
+    var: network_interfaces.stdout_lines
+
+- name: Get current connection name for primary interface
+  command: nmcli -g NAME connection show --active
+  register: active_connections
+  changed_when: false
+
+- name: Set primary connection name
+  set_fact:
+    primary_connection: "{{ active_connections.stdout_lines | select('search', primary_interface) | first }}"
+
+- name: Debug - Show primary connection name
+  debug:
+    var: primary_connection
+
+- name: Create Linux Bridge
+  command: >
+    nmcli con add type bridge ifname {{ bridge_name }}
+    con-name {{ bridge_name }} ipv4.method auto
+  args:
+    creates: "/etc/sysconfig/network-scripts/ifcfg-{{ bridge_name }}"
+
+- name: Configure bridge to use DHCP
+  command: >
+    nmcli con modify {{ bridge_name }} ipv4.method auto
+  changed_when: false
+
+- name: Add physical interface to bridge
+  command: >
+    nmcli con add type bridge-slave ifname {{ primary_interface }}
+    master {{ bridge_name }} con-name bridge-slave-{{ primary_interface }}
+  args:
+    creates: "/etc/sysconfig/network-scripts/ifcfg-bridge-slave-{{ primary_interface }}"
+
+- name: Ensure original connection is kept
+  command: >
+    nmcli con modify "{{ primary_connection }}" connection.autoconnect yes
+  changed_when: false
+
+- name: Deactivate primary interface connection
+  command: nmcli con down "{{ primary_connection }}"
+  ignore_errors: yes
+
+- name: Activate bridge connection
+  command: nmcli con up {{ bridge_name }}
+  async: 60
+  poll: 0
+
+- name: Wait for bridge to be up
+  wait_for_connection:
+    delay: 5
+    timeout: 60
+
+- name: Activate slave connection
+  command: nmcli con up bridge-slave-{{ primary_interface }}
+  async: 60
+  poll: 0
+
+- name: Final wait for connection
+  wait_for_connection:
+    delay: 5
+    timeout: 60
+
+# ... rest of the tasks remain the same ...
+
+- name: Debug - Show network interfaces after setup
+  command: ip a
+  register: network_interfaces_after
+  changed_when: false
+
+- name: Debug - Show network interfaces after setup output
+  debug:
+    var: network_interfaces_after.stdout_lines
+
+- name: Debug - Show NetworkManager connections
+  command: nmcli con show
+  register: nm_connections
+  changed_when: false
+
+- name: Debug - Show NetworkManager connections output
+  debug:
+    var: nm_connections.stdout_lines
+
+- name: Check if firewalld is installed
+  command: which firewall-cmd
+  register: firewalld_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Install firewalld if not present
+  dnf:
+    name: firewalld
+    state: present
+  when: firewalld_check.rc != 0
+
+- name: Ensure firewalld is running and enabled
+  systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+  when: firewalld_check.rc == 0
+
+- name: Check if firewalld is active
+  command: firewall-cmd --state
+  register: firewalld_active
+  ignore_errors: yes
+  changed_when: false
+
+- name: Configure firewalld (if active)
+  block:
+    - name: Allow bridge traffic in firewalld (permanent)
+      command: firewall-cmd --permanent --zone=public --add-interface={{ bridge_name }}
+      register: firewall_result
+      changed_when: firewall_result.rc == 0 and "success" in firewall_result.stdout
+
+    - name: Allow bridge traffic in firewalld (runtime)
+      command: firewall-cmd --zone=public --add-interface={{ bridge_name }}
+      changed_when: firewall_result.rc == 0 and "success" in firewall_result.stdout
+
+    - name: Reload firewalld
+      command: firewall-cmd --reload
+      when: firewall_result.changed
+  when: firewalld_active.rc == 0
+
+- name: Warn if firewalld is not active
+  debug:
+    msg: "WARNING: FirewallD is not active. Please ensure the bridge interface is properly secured."
+  when: firewalld_active.rc != 0

@@ -1,0 +1,11 @@
+[project]
+name = "qarax-node-installer"
+version = "0.1.0"
+description = "Qarax node installer"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ansible-runner>=2.4.0",
+    "fastapi>=0.115.6",
+    "pydantic>=2.10.4",
+]

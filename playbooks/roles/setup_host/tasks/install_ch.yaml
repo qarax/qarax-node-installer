@@ -1,0 +1,42 @@
+---
+- name: Check if cloud-hypervisor exists
+  stat:
+    path: /usr/local/bin/cloud-hypervisor
+  register: cloud_hypervisor
+
+- name: Create temp directory for download
+  tempfile:
+    state: directory
+  register: temp_dir
+  when: not cloud_hypervisor.stat.exists
+
+- name: Download cloud-hypervisor
+  get_url:
+    url: "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v{{ chversion }}/cloud-hypervisor-static"
+    dest: "{{ temp_dir.path }}/cloud-hypervisor"
+    mode: "0755"
+  when: not cloud_hypervisor.stat.exists
+
+- name: Move cloud-hypervisor to /usr/local/bin
+  copy:
+    src: "{{ temp_dir.path }}/cloud-hypervisor"
+    dest: /usr/local/bin/cloud-hypervisor
+    mode: "0755"
+    remote_src: yes
+  become: yes
+  when: not cloud_hypervisor.stat.exists
+
+- name: Clean up temp directory
+  file:
+    path: "{{ temp_dir.path }}"
+    state: absent
+  when: not cloud_hypervisor.stat.exists
+
+- name: Verify cloud-hypervisor installation
+  command: cloud-hypervisor --version
+  register: ch_version
+  changed_when: false
+
+- name: Show cloud-hypervisor version
+  debug:
+    var: ch_version.stdout

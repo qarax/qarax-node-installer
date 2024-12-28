@@ -1,0 +1,12 @@
+---
+- name: Setup qarax host
+  hosts: all
+  become: yes
+  roles:
+    - setup_host
+
+  handlers:
+    - name: Reload firewalld
+      systemd:
+        name: firewalld
+        state: reloaded
